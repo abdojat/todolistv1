@@ -30,8 +30,8 @@ let myItems = function () {
     return Item.find({}).then(token => { return token; });
 }
 
-let deleteItem = function (id) {
-    return Item.deleteOne({ _id: id }).then(token => { return token; });
+let deleteItem = function (checkedItemName) {
+    return Item.deleteOne({ name: checkedItemName }).then(token => { return token; });
 }
 
 let findCustomListItems = function (customListName) {
@@ -62,7 +62,6 @@ app.get('/', (req, res) => {
 
 app.get('/:customListName', (req, res) => {
     const customListName = req.params.customListName;
-    console.log(customListName);
     var exists = false;
     let checking = checkExistence(customListName);
     checking.then(function (result) {
@@ -75,7 +74,6 @@ app.get('/:customListName', (req, res) => {
         }
         let findingCustomList = findCustomListItems(customListName);
         findingCustomList.then(function (result) {
-            console.log(result[0]);
             res.render('list', { listTitle: customListName, listItems: result[0].customListItems });
         });
     });
@@ -84,22 +82,30 @@ app.get('/:customListName', (req, res) => {
 app.post('/delete/:custumListNameDel', (req, res) => {
     const day = date.getDate();
     const custumListNameDel = req.params.custumListNameDel;
-    const checkedItemId = req.body.checkBox;
+    const checkedItemName = req.body.checkBox;
     if (_.lowerCase(custumListNameDel) === _.lowerCase(day)) {
-        console.log(checkedItemId);
-        deleteItem(checkedItemId);
+        console.log(checkedItemName);
+        deleteItem(checkedItemName);
         res.redirect('/');
     }
-    else 
-    {
-        let findingCustomList = findCustomListItems(customListName);
+    else {
+        let findingCustomList = findCustomListItems(custumListNameDel);
         findingCustomList.then(function (result) {
             let update = result[0].customListItems;
-            update.push(item);
-            console.log(update);
-            let findingcustomListAndUpdate = findOneCustumListAndUpdate(customListName, update);
+            let item = {};
+            console.log(checkedItemName);
+            update.forEach((element) => {
+                console.log(element._id);
+                if (element.name === checkedItemName) {
+                    console.log(element._id.toString())
+                    update.remove(element);
+                }
+            })
+            console.log(item);
+            //console.log(update);
+            let findingcustomListAndUpdate = findOneCustumListAndUpdate(custumListNameDel, update);
             findingcustomListAndUpdate.then(function (result) {
-                res.redirect('/' + customListName);
+                res.redirect('/' + custumListNameDel);
             });
         });
     }
