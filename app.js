@@ -6,8 +6,10 @@ const _ = require('lodash');
 const { ListCollectionsCursor } = require('mongodb');
 const { render } = require('ejs');
 
+const uri = "mongodb+srv://abdojat:qazedfcujm@cluster0.w4z0kmh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+
 const url = "mongodb://localhost:27017/todolistDB";
-mongoose.connect(url);
+mongoose.connect(uri);
 
 const app = express();
 
