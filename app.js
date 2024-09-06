@@ -6,12 +6,15 @@ const _ = require('lodash');
 const { ListCollectionsCursor } = require('mongodb');
 const { render } = require('ejs');
 
-const uri = "mongodb+srv://abdojat:qazedfcujm@cluster0.w4z0kmh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
-
-const url = "mongodb://localhost:27017/todolistDB";
-mongoose.connect(uri);
-
 const app = express();
+
+const ToDoListRoute = "https://threebdojapi.onrender.com/todolist"
+
+function encodeFormData(data) {
+    return Object.keys(data)
+        .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
+        .join('&');
+}
 
 const itemsSchema = {
     name: String
@@ -28,26 +31,6 @@ const Item = mongoose.model('Item', itemsSchema);
 
 const temp = new Item({ name: 'temp' });
 
-let myItems = function () {
-    return Item.find({}).then(token => { return token; });
-}
-
-let deleteItem = function (checkedItemName) {
-    return Item.deleteOne({ name: checkedItemName }).then(token => { return token; });
-}
-
-let findCustomListItems = function (customListName) {
-    return List.find({ name: customListName }).then(token => { return token; });
-}
-
-let findOneCustumListAndUpdate = function (customListName, update) {
-    return List.findOneAndUpdate({ name: customListName }, { $set: { customListItems: update } }).then(token => { return token; });
-}
-
-let checkExistence = function (customListName) {
-    return List.exists({ name: customListName }).then(token => { return token; });
-}
-
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
@@ -56,83 +39,139 @@ app.get('/favicon.ico', (req, res) => res.status(204));
 
 app.get('/', (req, res) => {
     const day = date.getDate();
-    let items = myItems();
-    items.then(function (result) {
-        res.render('list', { listTitle: day, listItems: result });
-    });
+    fetch(ToDoListRoute)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then((result) => {
+            console.log(result);
+            res.render('list', { listTitle: day, listItems: result });
+        });
 });
 
 app.get('/:customListName', (req, res) => {
     const customListName = req.params.customListName;
-    var exists = false;
-    let checking = checkExistence(customListName);
-    checking.then(function (result) {
-        if (result === null) {
-            const list = new List({
-                name: customListName,
-                customListItems: [temp]
-            });
-            list.save();
-        }
-        let findingCustomList = findCustomListItems(customListName);
-        findingCustomList.then(function (result) {
-            res.render('list', { listTitle: customListName, listItems: result[0].customListItems });
+    fetch(ToDoListRoute + '/' + customListName)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then((result) => {
+            console.log(result);
+            res.render('list', { listTitle: customListName, listItems: result.customListItems });
         });
-    });
 });
 
 app.post('/delete/:custumListNameDel', (req, res) => {
     const day = date.getDate();
     const custumListNameDel = req.params.custumListNameDel;
-    const checkedItemName = req.body.checkBox;
+    const chechedItemId = req.body.checkBox;
+    const chechedItemName = req.body.name;
+    console.log(chechedItemName);
     if (_.lowerCase(custumListNameDel) === _.lowerCase(day)) {
-        console.log(checkedItemName);
-        deleteItem(checkedItemName);
-        res.redirect('/');
+        fetch(ToDoListRoute, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: encodeFormData({
+                id: chechedItemId
+            })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Delete successful:', data);
+                res.redirect('/');
+            })
+            .catch(error => {
+                console.error('There was a problem with the delete operation:', error);
+            });
     }
     else {
-        let findingCustomList = findCustomListItems(custumListNameDel);
-        findingCustomList.then(function (result) {
-            let update = result[0].customListItems;
-            let item = {};
-            console.log(checkedItemName);
-            update.forEach((element) => {
-                console.log(element._id);
-                if (element.name === checkedItemName) {
-                    console.log(element._id.toString())
-                    update.remove(element);
-                }
+        fetch(ToDoListRoute + '/' + custumListNameDel, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: encodeFormData({
+                ItemName: chechedItemName
             })
-            console.log(item);
-            //console.log(update);
-            let findingcustomListAndUpdate = findOneCustumListAndUpdate(custumListNameDel, update);
-            findingcustomListAndUpdate.then(function (result) {
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok ' + response.statusText);
+                }
+                return response;
+            })
+            .then(data => {
+                console.log('Delete successful:', data);
                 res.redirect('/' + custumListNameDel);
+            })
+            .catch(error => {
+                console.error('There was a problem with the delete operation:', error);
             });
-        });
     }
 });
 
 app.post('/:customListName', (req, res) => {
     const customListName = req.params.customListName;
     if (_.lowerCase(customListName) === _.lowerCase(date.getDate())) {
-        const item = new Item({ name: req.body.newItem });
-        item.save();
-        res.redirect('/');
+        fetch(ToDoListRoute, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: encodeFormData({
+                newItem: req.body.newItem
+            })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok ' + response.statusText);
+                }
+                return response;
+            })
+            .then(data => {
+                console.log('Success:', data);
+                res.redirect('/');
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+            });
     }
     else {
-        const item = new Item({ name: req.body.newItem });
-        console.log(item);
-        let findingCustomList = findCustomListItems(customListName);
-        findingCustomList.then(function (result) {
-            let update = result[0].customListItems;
-            update.push(item);
-            console.log(update);
-            let findingcustomListAndUpdate = findOneCustumListAndUpdate(customListName, update);
-            findingcustomListAndUpdate.then(function (result) {
-                res.redirect('/' + customListName);
+        fetch(ToDoListRoute + "/" + customListName, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: encodeFormData({
+                customListNewItemName: req.body.newItem
+            })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok ' + response.statusText);
+                }
+                return response;
+            })
+            .then(data => {
+                console.log('Success:', data);
+                res.redirect("/" + customListName);
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
             });
-        });
     }
 });
 
